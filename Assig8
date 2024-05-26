@@ -1,0 +1,54 @@
+import random
+from sympy import mod_inverse, isprime
+
+# Hilfsfunktion zur Erzeugung eines großen Primzahlenpaares
+def generate_large_primes(keysize):
+    while True:
+        p = random.getrandbits(keysize)
+        q = random.getrandbits(keysize)
+        if isprime(p) and isprime(q):
+            return p, q
+
+# RSA Schlüsselgenerierung
+def generate_rsa_keys(keysize=1024):
+    p, q = generate_large_primes(keysize // 2)
+    n = p * q
+    phi = (p - 1) * (q - 1)
+    e = 65537  
+    d = mod_inverse(e, phi)
+    return (e, n), (d, n)
+
+# Nachricht signieren
+def sign_message(m, private_key):
+    d, n = private_key
+    return pow(m, d, n)
+
+# funktion für die Chosen Ciphertext Attacke
+def chosen_ciphertext_attack():
+    public_key, private_key = generate_rsa_keys()
+    e, n = public_key
+    d, n = private_key
+
+    # Nachrichten generieren 
+    m1 = 123456789  
+    m2 = 987654321 
+    m3 = (m1 * m2) % n
+
+    # Alice bitten, m1 und m2 zu signieren
+    s1 = sign_message(m1, private_key)
+    s2 = sign_message(m2, private_key)
+
+    # Signatur für m3 berechnen
+    s3 = (s1 * s2) % n
+
+   
+    # Verifizierung: s3^e mod n sollte gleich m3 sein
+    assert pow(s3, e, n) == m3
+
+    print(f"Public Key (e, n): {public_key}")
+    print(f"Private Key (d, n): {private_key}")
+    print(f"m1: {m1}, m2: {m2}, m3: {m3}")
+    print(f"s1: {s1}, s2: {s2}, s3: {s3}")
+    print("Attack successful! s3 is a valid signature for m3.")
+
+chosen_ciphertext_attack()
