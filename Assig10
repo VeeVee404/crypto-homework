@@ -1,0 +1,68 @@
+import time
+import numpy as np
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from hashlib import sha3_256
+import matplotlib.pyplot as plt
+
+def aes_encrypt(key, data):
+    cipher = AES.new(key, AES.MODE_ECB)
+    return cipher.encrypt(data)
+
+def tandem_davies_meyer_aes(message, key, block_size=32):
+    # Initialisierung
+    h = b'\x00' * block_size
+    message = pad(message, block_size)
+    
+    # Davies-Meyer Konstruktion
+    for i in range(0, len(message), block_size):
+        block = message[i:i+block_size]
+        encrypted = aes_encrypt(key, block)
+        h = bytes([_h ^ _e for _h, _e in zip(h, encrypted)])
+    
+    return h
+
+def measure_runtime(hash_func, message, num_measurements=10):
+    times = []
+    for _ in range(num_measurements):
+        start_time = time.perf_counter()
+        hash_func(message)
+        end_time = time.perf_counter()
+        times.append(end_time - start_time)
+    return np.mean(times), np.std(times)
+
+# Vergleich der Laufzeiten
+message_sizes = [2**i for i in range(1, 21)]
+key = b'\x00' * 32  # 256-bit Schlüssel
+num_measurements = 10
+
+tandem_davies_meyer_times = []
+sha3_times = []
+
+for size in message_sizes:
+    message = b'a' * size
+    
+    # Anpassung der Anzahl der Messungen für kleinere Nachrichtengrößen
+    adjusted_measurements = num_measurements if size >= 1024 else num_measurements * 100
+    
+    # Messen der Laufzeit für Tandem Davies-Meyer mit AES
+    tdm_mean_time, tdm_std_time = measure_runtime(lambda msg: tandem_davies_meyer_aes(msg, key), message, adjusted_measurements)
+    tandem_davies_meyer_times.append((tdm_mean_time, tdm_std_time))
+    
+    # Messen der Laufzeit für SHA-3
+    sha3_mean_time, sha3_std_time = measure_runtime(sha3_256, message, adjusted_measurements)
+    sha3_times.append((sha3_mean_time, sha3_std_time))
+
+# Ausgabe der Ergebnisse
+tdm_means, tdm_stds = zip(*tandem_davies_meyer_times)
+sha3_means, sha3_stds = zip(*sha3_times)
+
+plt.errorbar(message_sizes, tdm_means, yerr=tdm_stds, label='Tandem Davies-Meyer AES', fmt='-o')
+plt.errorbar(message_sizes, sha3_means, yerr=sha3_stds, label='SHA-3-256', fmt='-o')
+plt.xlabel('Nachrichtengröße (Bytes)')
+plt.ylabel('Laufzeit (Sekunden)')
+plt.legend()
+plt.xscale('log')
+plt.yscale('log')
+plt.title('Laufzeitvergleich: Tandem Davies-Meyer AES vs SHA-3-256')
+plt.show()
