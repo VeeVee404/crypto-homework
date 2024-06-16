@@ -1,0 +1,71 @@
+import time
+import os
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+from Crypto.Util import Counter
+import nacl.secret
+import nacl.utils
+
+# Blum-Blum-Shub Generator
+def blum_blum_shub(bits, seed, p, q):
+    n = p * q
+    x = seed % n
+    result = []
+    for _ in range(bits):
+        x = (x * x) % n
+        result.append(x & 1)
+    return result
+
+# Konvertiert eine Liste von Bits zu Bytes
+def bits_to_bytes(bits):
+    byte_array = bytearray()
+    for i in range(0, len(bits), 8):
+        byte = 0
+        for bit in bits[i:i+8]:
+            byte = (byte << 1) | bit
+        byte_array.append(byte)
+    return bytes(byte_array)
+
+# OTP Verschlüsselung mit BBS
+def otp_bbs_encrypt_decrypt(data, key_stream):
+    return bytes([b ^ k for b, k in zip(data, key_stream)])
+
+# AES-CFB Verschlüsselung
+def aes_cfb_encrypt_decrypt(data, key, iv):
+    cipher = AES.new(key, AES.MODE_CFB, iv)
+    return cipher.encrypt(data)
+
+# eStream Portfolio (z.B. Salsa20)
+def salsa20_encrypt_decrypt(data, key, nonce):
+    box = nacl.secret.SecretBox(key)
+    return box.encrypt(data, nonce)
+
+# Geschwindigkeitstest
+def benchmark(function, *args):
+    start_time = time.time()
+    function(*args)
+    end_time = time.time()
+    return end_time - start_time
+
+# Beispielparameter
+data = b"Secret data to encrypt. " * 10000  # Größere Datenmenge für bessere Messung
+key = os.urandom(32)
+iv = os.urandom(16)
+nonce = os.urandom(24)
+p = 383
+q = 503
+seed = 47
+bbs_bits = len(data) * 8
+
+# BBS Key Stream
+bbs_bits = blum_blum_shub(bbs_bits, seed, p, q)
+bbs_key_stream = bits_to_bytes(bbs_bits)
+
+# Verschlüsselung und Benchmark
+time_bbs = benchmark(otp_bbs_encrypt_decrypt, data, bbs_key_stream)
+time_aes_cfb = benchmark(aes_cfb_encrypt_decrypt, data, key, iv)
+time_salsa20 = benchmark(salsa20_encrypt_decrypt, data, key, nonce)
+
+print(f"BBS Encryption Time: {time_bbs:.6f} seconds")
+print(f"AES-CFB Encryption Time: {time_aes_cfb:.6f} seconds")
+print(f"Salsa20 Encryption Time: {time_salsa20:.6f} seconds")
